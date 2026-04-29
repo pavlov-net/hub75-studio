@@ -51,6 +51,7 @@ lvgl:
         then:
           - lambda: |-
               id(output_video).stop();
+              lv_canvas_fill_bg(id(video_canvas), lv_color_black(), LV_OPA_COVER);
 
 # -----------------------------
 # Auto-switch page when source changes
