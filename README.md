@@ -53,7 +53,7 @@ Built on **ESPHome** with **LVGL** for smooth graphics, everything integrates se
 ## Features
 
 **Transform Your Matrix Into:**
-- 🎵 **Music Dashboard** — Album art, track info, progress bar (multi‑room support)
+- 🎵 **Music Dashboard** — Album art, track info, progress bar (multi‑room support; full layout needs 128x64. Single 64x64 panel shows album art only)
 - 🏈 **Sports Center** — Live scores for multiple teams (works with ha‑teamtracker)
 - 🌤️ **Info Display** — Weather, time, person status, timers, QR codes
 - 📊 **Visualizer** — Real‑time audio spectrum, presence radar

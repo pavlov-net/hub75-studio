@@ -2,7 +2,11 @@
 # SPDX-License-Identifier: MIT
 
 # Now Playing (LVGL + DDP)
-# This is designed to work with two horizontal panels (128x64)
+# HARDWARE REQUIREMENT: This page's full layout (album art + track info +
+# progress bar) is designed for a 128x64 display (two horizontal 64x64
+# panels chained). On a single 64x64 panel, ONLY the album art is shown --
+# track title/artist and the progress bar are not displayed. This is by
+# design, not a bug.
 #
 # Required vars:
 #   uid: Unique identifier for this instance (e.g., "living_room")
