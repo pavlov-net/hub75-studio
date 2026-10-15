@@ -16,10 +16,10 @@ lvgl_page_manager:
 
 substitutions:
   # Page-specific configuration
-  TEAM_LOGO_SIZE: "32"
+  TEAM_LOGO_SIZE: "64"
   TEAM_LOGO_Y: "0"
   AWAY_LOGO_X: "0"
-  HOME_LOGO_X: "32"
+  HOME_LOGO_X: "64"
 
 
 # DDP sink + canvas binding for team logos
@@ -292,8 +292,8 @@ lvgl:
             id: game_container_${uid}
             x: 0
             y: 0
-            width: 64
-            height: 64
+            width: 128
+            height: 128
             widgets:
               # Away team logo (left)
               - canvas:
@@ -315,8 +315,8 @@ lvgl:
               - label:
                   id: away_team_lbl_${uid}
                   x: 0
-                  y: 34
-                  width: 32
+                  y: 66
+                  width: 64
                   text_align: CENTER
                   text: "AWAY"
                   styles: ["st_team_text_${uid}"]
@@ -324,8 +324,8 @@ lvgl:
               - label:
                   id: away_score_lbl_${uid}
                   x: 0
-                  y: 44
-                  width: 32
+                  y: 78
+                  width: 64
                   text_align: CENTER
                   text: "0"
                   styles: ["st_score_text_${uid}"]
@@ -333,18 +333,18 @@ lvgl:
               # Home team name and score (right side)
               - label:
                   id: home_team_lbl_${uid}
-                  x: 32
-                  y: 34
-                  width: 32
+                  x: 64
+                  y: 66
+                  width: 64
                   text_align: CENTER
                   text: "HOME"
                   styles: ["st_team_text_${uid}"]
 
               - label:
                   id: home_score_lbl_${uid}
-                  x: 32
-                  y: 44
-                  width: 32
+                  x: 64
+                  y: 78
+                  width: 64
                   text_align: CENTER
                   text: "0"
                   styles: ["st_score_text_${uid}"]
@@ -353,8 +353,8 @@ lvgl:
               - label:
                   id: game_status_lbl_${uid}
                   x: 0
-                  y: 54
-                  width: 64
+                  y: 118
+                  width: 128
                   text_align: CENTER
                   long_mode: SCROLL_CIRCULAR
                   text: "Game Status"
@@ -365,24 +365,24 @@ lvgl:
             id: no_game_container_${uid}
             x: 0
             y: 0
-            width: 64
-            height: 64
+            width: 128
+            height: 128
             hidden: true
             widgets:
               # League logo (22x22 at top center)
               - canvas:
                   id: league_logo_canvas_${uid}
-                  x: 21
-                  y: 2
-                  width: 22
-                  height: 22
+                  x: 42
+                  y: 4
+                  width: 44
+                  height: 44
 
               # Team abbr or league name
               - label:
                   id: no_game_team_lbl_${uid}
                   x: 0
-                  y: 28
-                  width: 64
+                  y: 60
+                  width: 128
                   text_align: CENTER
                   text: "???"
 
@@ -390,8 +390,8 @@ lvgl:
               - label:
                   id: no_game_msg_lbl_${uid}
                   x: 0
-                  y: 42
-                  width: 64
+                  y: 74
+                  width: 128
                   text_align: CENTER
                   long_mode: WRAP
                   text: "Nothing Upcoming"
