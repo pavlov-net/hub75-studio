@@ -9,34 +9,36 @@ permissions:
   contents: write
   pull-requests: write
 
+# One run at a time, so a queued run sees the previous run's version-bump commit.
+concurrency:
+  group: release-drafter
+  cancel-in-progress: false
+
 jobs:
   release-drafter:
     name: Release Drafter
-    environment: release-drafter
     runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
-      - uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7
+      - uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0
         id: drafter
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          token: ${{ secrets.RELEASE_TOKEN }}
+          ref: ${{ github.ref }}
 
-      - name: Update version files
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: false
+
+      - name: Bump version
+        env:
+          VERSION: ${{ steps.drafter.outputs.resolved_version }}
         run: |
-          sed -i 's/^version = .*/version = "${{ steps.drafter.outputs.resolved_version }}"/g' pyproject.toml
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
-
-      - name: Regenerate lockfile
-        run: uv lock
-
-      - name: Commit changes
-        run: |
-          if ! git diff --quiet; then
-            git config --global user.name "github-actions[bot]"
-            git config --global user.email "github-actions[bot]@users.noreply.github.com"
-            git commit -am "Bump version to ${{ steps.drafter.outputs.resolved_version }} [skip ci]"
+          uv version --no-sync "$VERSION"
+          git add pyproject.toml uv.lock
+          if ! git diff --cached --quiet; then
+            git -c user.name="github-actions[bot]" \
+                -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                commit -m "Bump version to $VERSION [skip ci]"
             git push
           fi
