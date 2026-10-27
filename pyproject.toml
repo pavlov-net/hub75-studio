@@ -16,8 +16,10 @@ dev = [
 [tool.uv]
 # ESPHome pins exact versions of these. Override them to versions with
 # security fixes; they are only used at build time on our own assets.
+# ESPHome also runs `uv pip install` from here to set up ESP-IDF's Python
+# environment, so these apply there too. Don't override anything ESP-IDF
+# constrains (e.g. it needs cryptography<45).
 override-dependencies = [
-    "cryptography>=50.0.0",
     "filelock>=4.2.1",
     "pillow>=13.0.0",
 ]
