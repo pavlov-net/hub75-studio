@@ -3,12 +3,23 @@ name = "hub75-studio"
 version = "0.7.2"
 description = "ESPHome project for HUB75 matrix controllers"
 readme = "README.md"
-requires-python = ">=3.12,<3.15"
-dependencies = [
+requires-python = ">=3.13,<3.15"
+dependencies = []
+
+[dependency-groups]
+dev = [
     "esphome>=2026.7.0,<2026.11",
     # PlatformIO (used by ESPHome for ESP-IDF builds) expects pip to be available
     "pip",
 ]
 
-[dependency-groups]
-dev = []
+[tool.uv]
+# ESPHome pins exact versions of these. Override them to versions with
+# security fixes; they are only used at build time on our own assets.
+# ESPHome also runs `uv pip install` from here to set up ESP-IDF's Python
+# environment, so these apply there too. Don't override anything ESP-IDF
+# constrains (e.g. it needs cryptography<45).
+override-dependencies = [
+    "filelock>=4.2.1",
+    "pillow>=13.0.0",
+]
