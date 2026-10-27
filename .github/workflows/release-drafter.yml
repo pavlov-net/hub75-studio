@@ -18,12 +18,14 @@ jobs:
   release-drafter:
     name: Release Drafter
     runs-on: blacksmith-2vcpu-ubuntu-2404
+    environment: release-drafter
     steps:
       - uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0
         id: drafter
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           ref: ${{ github.ref }}
 
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
@@ -33,12 +35,26 @@ jobs:
       - name: Bump version
         env:
           VERSION: ${{ steps.drafter.outputs.resolved_version }}
+        run: uv version --no-sync "$VERSION"
+
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          client-id: ${{ vars.RELEASE_DRAFTER_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_DRAFTER_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Commit and push
+        env:
+          VERSION: ${{ steps.drafter.outputs.resolved_version }}
+          PUSH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          uv version --no-sync "$VERSION"
           git add pyproject.toml uv.lock
           if ! git diff --cached --quiet; then
-            git -c user.name="github-actions[bot]" \
-                -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            git -c user.name="pavlov-net-release-drafter[bot]" \
+                -c user.email="349057244+pavlov-net-release-drafter[bot]@users.noreply.github.com" \
                 commit -m "Bump version to $VERSION [skip ci]"
-            git push
+            # The app token bypasses the default-branch ruleset; hand it to git only for this push.
+            git -c credential.helper= -c credential.https://github.com.helper= \
+                -c credential.helper='!f() { echo username=x-access-token; echo "password=$PUSH_TOKEN"; }; f' push
           fi
