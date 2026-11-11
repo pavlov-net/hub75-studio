@@ -1,0 +1,404 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+# Team Tracker (LVGL + DDP)
+# Displays team logos, scores, and game status
+#
+# Required vars:
+#   uid: Unique identifier for this instance (e.g., "falcons")
+#   page_friendly_name: Name of the page (e.g., Team Tracker - Falcons)
+#   entity_id: Home Assistant team tracker sensor (e.g., sensor.team_tracker_nfl_falcons)
+
+lvgl_page_manager:
+  pages:
+    - page: teamtracker_${uid}
+      friendly_name: "${page_friendly_name}"
+
+substitutions:
+  # Page-specific configuration
+  TEAM_LOGO_SIZE: "64"
+  TEAM_LOGO_Y: "0"
+  AWAY_LOGO_X: "0"
+  HOME_LOGO_X: "64"
+
+
+# DDP sink + canvas binding for team logos
+ddp_canvas:
+  - id: stream_away_${uid}
+    canvas: away_logo_canvas_${uid}
+    back_buffers: 0
+  - id: stream_home_${uid}
+    canvas: home_logo_canvas_${uid}
+    back_buffers: 0
+  - id: stream_league_${uid}
+    canvas: league_logo_canvas_${uid}
+    back_buffers: 0
+
+# WebSocket control for logo streaming
+media_proxy_control:
+  id: mp_control
+  outputs:
+    - id: output_away_${uid}
+      stream: stream_away_${uid}
+      src: ""
+      loop: false
+      format: rgb565
+    - id: output_home_${uid}
+      stream: stream_home_${uid}
+      src: ""
+      loop: false
+      format: rgb565
+    - id: output_league_${uid}
+      stream: stream_league_${uid}
+      src: ""
+      loop: false
+      format: rgb565
+
+script:
+  - id: update_page_visibility_${uid}
+    mode: restart
+    then:
+      - lambda: |-
+          std::string game_state = id(ha_teamtracker_entity_${uid}).has_state() ? id(ha_teamtracker_entity_${uid}).state : "";
+
+          if (game_state == "NOT_FOUND") {
+            // No game scheduled - show "no game" container, hide game container
+            lv_obj_add_flag(id(game_container_${uid}), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(no_game_container_${uid}), LV_OBJ_FLAG_HIDDEN);
+          } else {
+            // Game exists - show game container, hide "no game" container
+            lv_obj_clear_flag(id(game_container_${uid}), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(no_game_container_${uid}), LV_OBJ_FLAG_HIDDEN);
+          }
+
+  - id: update_game_status_${uid}
+    mode: restart
+    then:
+      - lambda: |-
+          std::string status_text = "";
+          std::string game_state = id(ha_teamtracker_entity_${uid}).has_state() ? id(ha_teamtracker_entity_${uid}).state : "";
+          std::string kickoff_in = id(ha_kickoff_in_${uid}).has_state() ? id(ha_kickoff_in_${uid}).state : "";
+          std::string game_clock = id(ha_game_clock_${uid}).has_state() ? id(ha_game_clock_${uid}).state : "";
+          std::string quarter = id(ha_game_quarter_${uid}).has_state() ? id(ha_game_quarter_${uid}).state : "";
+          std::string sport = id(ha_sport_name_${uid}).has_state() ? id(ha_sport_name_${uid}).state : "";
+
+          if (game_state == "PRE") {
+            // Pre-game: show kickoff time
+            status_text = kickoff_in;
+          } else if (game_state == "IN") {
+            // For at least NFL/Baseball/Hockey/Soccer, game_clock shows the important info.
+            // ("15:00 - 4th", "Top 9th", etc)
+            // If other sports should be more customized, can add them here if (sport == 'XXX') {}
+            status_text = !game_clock.empty() ? game_clock : "In Progress";
+          } else if (game_state == "POST") {
+            // Post-game: show clock (typically "Final")
+            status_text = !game_clock.empty() ? game_clock : "Final";
+          } else {
+            // Fallback to kickoff_in or game state
+            status_text = !kickoff_in.empty() ? kickoff_in : game_state;
+          }
+
+          lv_label_set_text(id(game_status_lbl_${uid}), status_text.c_str());
+
+# Pull NFL data from Home Assistant
+text_sensor:
+  - platform: homeassistant
+    id: ha_team_abbr_${uid}
+    entity_id: ${entity_id}
+    attribute: team_abbr
+    internal: true
+    on_value:
+      - lvgl.label.update:
+          id: away_team_lbl_${uid}
+          text: !lambda 'return x.c_str();'
+      - lvgl.label.update:
+          id: no_game_team_lbl_${uid}
+          text: !lambda |-
+            std::string league = id(ha_league_${uid}).has_state() ? id(ha_league_${uid}).state : "";
+            if (x == "*") {
+              return league.c_str();  // Show league name when team_abbr is "*"
+            }
+            return x.c_str();
+
+  - platform: homeassistant
+    id: ha_team_logo_${uid}
+    entity_id: ${entity_id}
+    attribute: team_logo
+    internal: true
+    on_value:
+      - if:
+          condition:
+            lambda: 'return !x.empty() && x != "None";'
+          then:
+            - media_proxy_control.set_source:
+                id: output_away_${uid}
+                src: !lambda "return x;"
+
+  - platform: homeassistant
+    id: ha_team_score_${uid}
+    entity_id: ${entity_id}
+    attribute: team_score
+    internal: true
+    on_value:
+      - lvgl.label.update:
+          id: away_score_lbl_${uid}
+          text: !lambda 'return x.c_str();'
+
+  - platform: homeassistant
+    id: ha_team_homeaway_${uid}
+    entity_id: ${entity_id}
+    attribute: team_homeaway
+    internal: true
+
+  - platform: homeassistant
+    id: ha_opponent_abbr_${uid}
+    entity_id: ${entity_id}
+    attribute: opponent_abbr
+    internal: true
+    on_value:
+      - lvgl.label.update:
+          id: home_team_lbl_${uid}
+          text: !lambda 'return x.c_str();'
+
+  - platform: homeassistant
+    id: ha_opponent_logo_${uid}
+    entity_id: ${entity_id}
+    attribute: opponent_logo
+    internal: true
+    on_value:
+      - if:
+          condition:
+            lambda: 'return !x.empty() && x != "None";'
+          then:
+            - media_proxy_control.set_source:
+                id: output_home_${uid}
+                src: !lambda "return x;"
+
+  - platform: homeassistant
+    id: ha_opponent_score_${uid}
+    entity_id: ${entity_id}
+    attribute: opponent_score
+    internal: true
+    on_value:
+      - lvgl.label.update:
+          id: home_score_lbl_${uid}
+          text: !lambda 'return x.c_str();'
+
+  - platform: homeassistant
+    id: ha_event_name_${uid}
+    entity_id: ${entity_id}
+    attribute: event_name
+    internal: true
+
+  - platform: homeassistant
+    id: ha_sport_name_${uid}
+    entity_id: ${entity_id}
+    attribute: sport
+    internal: true
+
+  - platform: homeassistant
+    id: ha_league_${uid}
+    entity_id: ${entity_id}
+    attribute: league
+    internal: true
+    on_value:
+      - lvgl.label.update:
+          id: no_game_team_lbl_${uid}
+          text: !lambda |-
+            std::string team_abbr = id(ha_team_abbr_${uid}).has_state() ? id(ha_team_abbr_${uid}).state : "";
+            if (team_abbr == "*") {
+              return x.c_str();  // Show league name when team_abbr is "*"
+            }
+            return team_abbr.c_str();
+
+  - platform: homeassistant
+    id: ha_league_logo_${uid}
+    entity_id: ${entity_id}
+    attribute: league_logo
+    internal: true
+    on_value:
+      - if:
+          condition:
+            lambda: 'return !x.empty() && x != "None";'
+          then:
+            - media_proxy_control.set_source:
+                id: output_league_${uid}
+                src: !lambda "return x;"
+
+  - platform: homeassistant
+    id: ha_kickoff_in_${uid}
+    entity_id: ${entity_id}
+    attribute: kickoff_in
+    internal: true
+    on_value:
+      - script.execute:
+          id: update_game_status_${uid}
+
+  - platform: homeassistant
+    id: ha_tv_network_${uid}
+    entity_id: ${entity_id}
+    attribute: tv_network
+    internal: true
+
+  - platform: homeassistant
+    id: ha_venue_${uid}
+    entity_id: ${entity_id}
+    attribute: venue
+    internal: true
+
+  - platform: homeassistant
+    id: ha_teamtracker_entity_${uid}
+    entity_id: ${entity_id}
+    internal: true
+    on_value:
+      - script.execute:
+          id: update_page_visibility_${uid}
+      - script.execute:
+          id: update_game_status_${uid}
+
+  - platform: homeassistant
+    id: ha_game_clock_${uid}
+    entity_id: ${entity_id}
+    attribute: clock
+    internal: true
+    on_value:
+      - script.execute:
+          id: update_game_status_${uid}
+
+  - platform: homeassistant
+    id: ha_game_quarter_${uid}
+    entity_id: ${entity_id}
+    attribute: quarter
+    internal: true
+    on_value:
+      - script.execute:
+          id: update_game_status_${uid}
+
+lvgl:
+  style_definitions:
+    - id: st_team_text_${uid}
+      text_opa: 90%
+    - id: st_score_text_${uid}
+      text_opa: 100%
+    - id: st_status_text_${uid}
+      text_opa: 75%
+
+  pages:
+    - id: teamtracker_${uid}
+      bg_color: 0x000000
+      widgets:
+        # Container for normal game display
+        - obj:
+            id: game_container_${uid}
+            x: 0
+            y: 0
+            width: 100%
+            height: 100%
+            widgets:
+              # Away team logo (left)
+              - canvas:
+                  id: away_logo_canvas_${uid}
+                  x: ${AWAY_LOGO_X}
+                  y: ${TEAM_LOGO_Y}
+                  width: ${TEAM_LOGO_SIZE}
+                  height: ${TEAM_LOGO_SIZE}
+
+              # Home team logo (right)
+              - canvas:
+                  id: home_logo_canvas_${uid}
+                  x: ${HOME_LOGO_X}
+                  y: ${TEAM_LOGO_Y}
+                  width: ${TEAM_LOGO_SIZE}
+                  height: ${TEAM_LOGO_SIZE}
+
+              # Away team name and score (left side)
+              - label:
+                  id: away_team_lbl_${uid}
+                  x: 0
+                  y: 66
+                  width: 64
+                  text_align: CENTER
+                  text: "AWAY"
+                  styles: [st_spleen16, "st_team_text_${uid}"]
+
+              - label:
+                  id: away_score_lbl_${uid}
+                  x: 0
+                  y: 78
+                  width: 64
+                  text_align: CENTER
+                  text: "0"
+                  styles: [st_spleen16, "st_score_text_${uid}"]
+
+              # Home team name and score (right side)
+              - label:
+                  id: home_team_lbl_${uid}
+                  x: 64
+                  y: 66
+                  width: 64
+                  text_align: CENTER
+                  text: "HOME"
+                  styles: [st_spleen16, "st_team_text_${uid}"]
+
+              - label:
+                  id: home_score_lbl_${uid}
+                  x: 64
+                  y: 78
+                  width: 64
+                  text_align: CENTER
+                  text: "0"
+                  styles: [st_spleen16, "st_score_text_${uid}"]
+
+              # Game status (bottom)
+              - label:
+                  id: game_status_lbl_${uid}
+                  x: 0
+                  y: 110
+                  width: 128
+                  text_align: CENTER
+                  long_mode: SCROLL_CIRCULAR
+                  text: "Game Status"
+                  styles: [st_spleen16, "st_status_text_${uid}"]
+
+        # Container for "no game" display
+        - obj:
+            id: no_game_container_${uid}
+            x: 0
+            y: 0
+            width: 100%
+            height: 100%
+            hidden: true
+            widgets:
+              # League logo (22x22 at top center)
+              - canvas:
+                  id: league_logo_canvas_${uid}
+                  x: 42
+                  y: 4
+                  width: 44
+                  height: 44
+
+              # Team abbr or league name
+              - label:
+                  id: no_game_team_lbl_${uid}
+                  x: 0
+                  y: 60
+                  width: 128
+                  text_align: CENTER
+                  text: "???"
+
+              # "Nothing Upcoming" message
+              - label:
+                  id: no_game_msg_lbl_${uid}
+                  x: 0
+                  y: 74
+                  width: 128
+                  text_align: CENTER
+                  long_mode: WRAP
+                  text: "Nothing Upcoming"
+
+      on_load:
+        then:
+          - lambda: |-
+              id(output_away_${uid}).start();
+              id(output_home_${uid}).start();
+              id(output_league_${uid}).start();
